@@ -1,0 +1,24 @@
+services:
+  neutts-api:
+    build:
+      context: ../..
+      dockerfile: docker/cpu/Dockerfile
+    ports:
+      - "8880:8880"
+    environment:
+      - NEUTTS_HOST=0.0.0.0
+      - NEUTTS_PORT=8880
+      - NEUTTS_DEFAULT_MODELS=neutts-nano-q4-gguf
+      - NEUTTS_DEFAULT_CODEC=neuphonic/neucodec-onnx-decoder
+      - NEUTTS_DEFAULT_BACKBONE_DEVICE=cpu
+      - NEUTTS_DEFAULT_CODEC_DEVICE=cpu
+      - NEUTTS_DEFAULT_VOICE=jo
+      - NEUTTS_LOG_LEVEL=INFO
+    volumes:
+      - voice-data:/app/api/src/voices/custom
+      - model-cache:/root/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  voice-data:
+  model-cache:

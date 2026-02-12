@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuTTS-FastAPI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --fg: #7c6aef;
+            --fg2: #a78bfa;
+            --surface: rgba(30, 41, 59, 1);
+            --surface2: rgba(15, 23, 42, 0.5);
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: rgba(148, 163, 184, 0.15);
+            --success: #4ade80;
+            --error: #f87171;
+            --warning: #fbbf24;
+            --radius: 12px;
+            --font: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { width: 100%; height: 100%; overflow-x: hidden; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Background effects */
+        .bg-glow {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background: radial-gradient(ellipse at 20% 0%, rgba(124,106,239,0.15) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 100%, rgba(167,139,250,0.08) 0%, transparent 50%);
+        }
+        .bg-grid {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background-image:
+                repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 24px),
+                repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 24px);
+        }
+
+        .app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+        /* Header */
+        header { text-align: center; margin-bottom: 2rem; }
+        .logo {
+            font-size: 2.2rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--fg), var(--fg2), #c084fc);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-top: 4px; }
+        .badges { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+        .badge {
+            display: flex; align-items: center; gap: 6px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 20px; padding: 5px 12px; font-size: 0.75rem; color: var(--text-dim);
+        }
+        .dot { width: 7px; height: 7px; border-radius: 50%; }
+        .dot-ok { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .dot-off { background: var(--error); }
+        .dot-warn { background: var(--warning); }
+
+        /* Device badge */
+        .device-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+            background: var(--surface); border: 1px solid var(--border);
+        }
+        .device-badge.gpu {
+            color: #4ade80; border-color: rgba(74,222,128,0.3);
+            background: rgba(74,222,128,0.08);
+        }
+        .device-badge.cpu {
+            color: var(--text-dim); border-color: var(--border);
+        }
+        .device-badge svg { width: 14px; height: 14px; }
+
+        /* GPU Warning Banner */
+        .gpu-warning {
+            background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3);
+            border-radius: var(--radius); padding: 14px 18px; margin-bottom: 1.5rem;
+            display: flex; align-items: flex-start; gap: 12px;
+            font-size: 0.85rem; color: var(--warning); line-height: 1.5;
+        }
+        .gpu-warning-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+        .gpu-warning-content { flex: 1; }
+        .gpu-warning-title { font-weight: 700; margin-bottom: 4px; }
+        .gpu-warning-text { font-size: 0.78rem; opacity: 0.9; white-space: pre-wrap; font-family: 'Consolas', 'Monaco', monospace; }
+        .gpu-warning-dismiss {
+            background: none; border: 1px solid rgba(251,191,36,0.3); border-radius: 4px;
+            color: var(--warning); cursor: pointer; padding: 2px 8px; font-size: 0.72rem;
+            font-family: var(--font); flex-shrink: 0; transition: all 0.2s;
+        }
+        .gpu-warning-dismiss:hover { background: rgba(251,191,36,0.15); }
+
+        /* Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 1.5rem;
+            align-items: start;
+        }
+        @media (max-width: 860px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+        }
+        .card-label {
+            font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.6px; color: var(--text-dim); margin-bottom: 12px;
+        }
+
+        /* Text Editor */
+        .text-editor textarea {
+            width: 100%; min-height: 180px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px; color: var(--text);
+            font-size: 0.95rem; font-family: var(--font); resize: vertical;
+            transition: border-color 0.2s;
+        }
+        .text-editor textarea:focus { outline: none; border-color: var(--fg); }
+        .text-meta {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 6px; font-size: 0.72rem; color: var(--text-dim);
+        }
+        .text-meta kbd {
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 4px; padding: 1px 5px; font-size: 0.68rem;
+        }
+
+        /* Player */
+        .player { margin-top: 1.25rem; }
+        .player-bar {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 10px; padding: 8px 12px; height: 48px;
+        }
+        .player-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--fg); border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; flex-shrink: 0;
+        }
+        .player-btn:hover { transform: scale(1.08); box-shadow: 0 0 16px rgba(124,106,239,0.3); }
+        .player-btn svg { fill: white; width: 16px; height: 16px; }
+        .seek-wrap { flex: 1; min-width: 0; }
+        .seek-slider {
+            -webkit-appearance: none; width: 100%; height: 4px;
+            background: rgba(124,106,239,0.2); border-radius: 2px;
+            outline: none; cursor: pointer;
+        }
+        .seek-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 14px; height: 14px;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .seek-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .seek-slider::-moz-range-thumb {
+            width: 14px; height: 14px; border: none;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+        }
+        .time-display {
+            font-size: 0.78rem; color: var(--text-dim); min-width: 80px;
+            text-align: center; font-variant-numeric: tabular-nums;
+            border-left: 1px solid var(--border); padding-left: 10px;
+        }
+        .vol-group {
+            display: flex; align-items: center; gap: 6px;
+            border-left: 1px solid var(--border); padding-left: 10px;
+        }
+        .vol-icon { color: var(--fg); opacity: 0.7; flex-shrink: 0; }
+        .vol-slider {
+            -webkit-appearance: none; width: 70px; height: 4px;
+            background: rgba(124,106,239,0.2); border-radius: 2px;
+            outline: none; cursor: pointer;
+        }
+        .vol-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+        }
+        .vol-slider::-moz-range-thumb {
+            width: 12px; height: 12px; border: none;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+        }
+
+        /* Wave visualizer */
+        .wave-box {
+            position: relative; width: 100%; height: 56px;
+            background: var(--surface2); border-radius: 8px;
+            overflow: hidden; margin-top: 8px;
+        }
+        .wave-box canvas { width: 100%; height: 100%; }
+        .gen-progress {
+            position: absolute; bottom: 0; left: 0; height: 3px;
+            background: var(--fg); border-radius: 2px; transition: width 0.3s;
+        }
+
+        /* Download button */
+        .dl-wrap {
+            position: absolute; bottom: 8px; right: 8px; z-index: 5;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .dl-wrap.ready { opacity: 1; pointer-events: auto; }
+        .dl-btn {
+            width: 34px; height: 34px; border-radius: 6px;
+            background: var(--surface); border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text); transition: all 0.2s;
+            position: relative; overflow: visible;
+        }
+        .dl-btn:hover { box-shadow: 0 0 12px rgba(124,106,239,0.3); transform: scale(1.05); }
+        .dl-glow {
+            position: absolute; inset: -4px; border-radius: 8px;
+            background: conic-gradient(from 0deg, var(--fg), #a78bfa, var(--fg));
+            animation: glow-spin 3s linear infinite; filter: blur(6px); opacity: 0.4; z-index: -1;
+        }
+        @keyframes glow-spin { to { transform: rotate(360deg); } }
+
+        /* Right panel controls */
+        .controls-panel { display: flex; flex-direction: column; gap: 1rem; }
+
+        /* Voice selector */
+        .voice-list { max-height: 160px; overflow-y: auto; }
+        .voice-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border-radius: 6px; cursor: pointer;
+            transition: background 0.15s; font-size: 0.85rem;
+        }
+        .voice-item:hover { background: rgba(124,106,239,0.1); }
+        .voice-item.active { background: rgba(124,106,239,0.2); border: 1px solid rgba(124,106,239,0.3); }
+        .voice-item .v-name { font-weight: 500; }
+        .voice-item .v-meta { font-size: 0.72rem; color: var(--text-dim); margin-left: auto; }
+        .voice-item .v-lang {
+            font-size: 0.65rem; background: rgba(124,106,239,0.15);
+            color: var(--fg2); border-radius: 4px; padding: 1px 6px;
+        }
+        .voice-item .v-delete {
+            font-size: 0.72rem; color: var(--error); cursor: pointer; opacity: 0.5;
+            font-weight: 700; transition: opacity 0.2s; margin-left: 4px;
+        }
+        .voice-item .v-delete:hover { opacity: 1; }
+        .voice-item.voice-unavailable {
+            opacity: 0.4; cursor: not-allowed; pointer-events: none;
+        }
+        .voice-item.voice-unavailable .v-name::after {
+            content: ' (no audio)'; font-size: 0.65rem; font-weight: 400; color: var(--text-dim);
+        }
+
+        /* Voice Upload Panel */
+        .voice-upload-toggle {
+            width: 100%; padding: 10px; margin-top: 10px;
+            background: transparent; border: 2px dashed var(--border);
+            border-radius: 8px; color: var(--text-dim); font-size: 0.82rem;
+            cursor: pointer; font-family: var(--font); transition: all 0.2s;
+        }
+        .voice-upload-toggle:hover { border-color: var(--fg); color: var(--fg2); }
+        .voice-upload-panel {
+            display: none; margin-top: 10px; padding: 12px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .voice-upload-panel.open { display: block; }
+        .voice-upload-panel input[type="text"],
+        .voice-upload-panel textarea,
+        .voice-upload-panel select {
+            width: 100%; padding: 8px 10px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.82rem;
+            font-family: var(--font); margin-bottom: 8px; transition: border-color 0.2s;
+        }
+        .voice-upload-panel input:focus,
+        .voice-upload-panel textarea:focus,
+        .voice-upload-panel select:focus { outline: none; border-color: var(--fg); }
+        .voice-upload-panel textarea { min-height: 60px; resize: vertical; }
+        .voice-upload-panel .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+
+        .drop-zone {
+            border: 2px dashed var(--border); border-radius: 8px;
+            padding: 20px; text-align: center; cursor: pointer;
+            color: var(--text-dim); font-size: 0.8rem; transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--fg); color: var(--fg2);
+            background: rgba(124,106,239,0.05);
+        }
+        .drop-zone.has-file {
+            border-color: var(--success); color: var(--success);
+            background: rgba(74,222,128,0.05);
+        }
+
+        .record-section {
+            text-align: center; margin: 8px 0;
+            padding: 8px 0; border-top: 1px solid var(--border);
+        }
+        .record-section-label { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 6px; }
+        .record-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(248,113,113,0.15); border: 2px solid rgba(248,113,113,0.3);
+            color: var(--error); cursor: pointer; font-size: 0.7rem; font-weight: 600;
+            font-family: var(--font); transition: all 0.2s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .record-btn:hover { background: rgba(248,113,113,0.25); transform: scale(1.05); }
+        .record-btn.recording {
+            background: var(--error); color: white; border-color: var(--error);
+            animation: record-pulse 1.2s ease-in-out infinite;
+        }
+        @keyframes record-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); }
+        }
+        .record-timer {
+            display: inline-block; margin-left: 8px;
+            font-size: 0.82rem; font-variant-numeric: tabular-nums;
+            color: var(--text-dim); min-width: 36px;
+        }
+
+        .voice-upload-progress {
+            height: 4px; background: var(--border); border-radius: 2px;
+            overflow: hidden; margin-bottom: 8px; display: none;
+        }
+        .voice-upload-progress-bar {
+            height: 100%; background: linear-gradient(90deg, var(--fg), var(--fg2));
+            border-radius: 2px; width: 0%; transition: width 0.3s;
+        }
+
+        .btn-upload {
+            width: 100%; padding: 10px; border: none; border-radius: 6px;
+            background: linear-gradient(135deg, var(--fg), #6d5ce7);
+            color: white; font-size: 0.85rem; font-weight: 600;
+            cursor: pointer; font-family: var(--font); transition: all 0.2s;
+        }
+        .btn-upload:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,106,239,0.3); }
+        .btn-upload:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        .voice-upload-status {
+            margin-top: 8px; padding: 8px; border-radius: 6px;
+            font-size: 0.78rem; text-align: center; display: none;
+        }
+        .voice-upload-status.upload-success {
+            display: block; background: rgba(74,222,128,0.1);
+            border: 1px solid rgba(74,222,128,0.2); color: var(--success);
+        }
+        .voice-upload-status.upload-error {
+            display: block; background: rgba(248,113,113,0.1);
+            border: 1px solid rgba(248,113,113,0.2); color: var(--error);
+        }
+
+        /* Selects & inputs */
+        select, input[type="text"] {
+            width: 100%; padding: 9px 10px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); font-size: 0.85rem;
+            font-family: var(--font); cursor: pointer; transition: border-color 0.2s;
+        }
+        select:focus, input[type="text"]:focus { outline: none; border-color: var(--fg); }
+
+        .field { margin-bottom: 12px; }
+        .field-label {
+            font-size: 0.75rem; font-weight: 500; color: var(--text-dim);
+            margin-bottom: 5px; display: block;
+        }
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        /* Speed slider */
+        .speed-row { display: flex; align-items: center; gap: 10px; }
+        .speed-range {
+            flex: 1; -webkit-appearance: none; height: 5px;
+            background: rgba(124,106,239,0.2); border-radius: 3px; outline: none;
+            accent-color: var(--fg);
+        }
+        .speed-range::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+        }
+        .speed-range::-moz-range-thumb {
+            width: 16px; height: 16px; border: none;
+            border-radius: 50%; background: var(--fg); cursor: pointer;
+        }
+        .speed-val {
+            font-weight: 600; color: var(--fg2); min-width: 42px; text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Checkboxes */
+        .check-row {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 0.82rem; color: var(--text-dim); cursor: pointer;
+        }
+        .check-row input { accent-color: var(--fg); width: 15px; height: 15px; cursor: pointer; }
+
+        /* Buttons */
+        .btn {
+            width: 100%; padding: 12px 20px; border: none; border-radius: 8px;
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; font-family: var(--font);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-gen {
+            background: linear-gradient(135deg, var(--fg), #6d5ce7);
+            color: white; position: relative; overflow: hidden;
+        }
+        .btn-gen:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(124,106,239,0.35);
+        }
+        .btn-gen:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-cancel {
+            background: rgba(248,113,113,0.15); color: var(--error);
+            border: 1px solid rgba(248,113,113,0.3); margin-top: 8px;
+        }
+        .btn-cancel:hover { background: rgba(248,113,113,0.25); }
+
+        /* Spinner */
+        .spinner {
+            width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white; border-radius: 50%;
+            animation: spin 0.7s linear infinite; display: none;
+        }
+        .spinning .spinner { display: block; }
+        .spinning .btn-label { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Model management panel */
+        .model-panel { margin-top: 1rem; }
+        .model-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2);
+            border-radius: 6px; padding: 4px 10px; font-size: 0.78rem;
+            color: var(--success); margin: 3px;
+        }
+        .model-tag .unload-x {
+            cursor: pointer; opacity: 0.6; font-weight: 700;
+            transition: opacity 0.2s;
+        }
+        .model-tag .unload-x:hover { opacity: 1; }
+        .model-load-row { display: flex; gap: 8px; margin-top: 8px; }
+        .btn-sm {
+            padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text); font-size: 0.8rem;
+            cursor: pointer; font-family: var(--font); transition: all 0.2s;
+        }
+        .btn-sm:hover { border-color: var(--fg); color: var(--fg2); }
+
+        /* Model tag expanded (with device info) */
+        .model-tag-expanded {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(74,222,128,0.06); border: 1px solid rgba(74,222,128,0.15);
+            border-radius: 8px; padding: 8px 12px; font-size: 0.8rem;
+            color: var(--text); margin-bottom: 6px;
+        }
+        .model-tag-expanded .model-name { font-weight: 600; color: var(--success); }
+        .model-tag-expanded .model-device-badge {
+            font-size: 0.68rem; font-weight: 600; padding: 2px 7px;
+            border-radius: 4px; text-transform: uppercase;
+        }
+        .model-device-badge.gpu-badge {
+            background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.25);
+        }
+        .model-device-badge.cpu-badge {
+            background: rgba(148,163,184,0.1); color: var(--text-dim); border: 1px solid var(--border);
+        }
+        .model-tag-expanded .model-lang {
+            font-size: 0.65rem; background: rgba(124,106,239,0.12);
+            color: var(--fg2); border-radius: 4px; padding: 1px 6px;
+        }
+        .model-tag-expanded .model-actions { margin-left: auto; display: flex; gap: 4px; }
+        .model-tag-expanded .toggle-device-btn {
+            padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border);
+            background: var(--surface2); color: var(--text-dim); font-size: 0.68rem;
+            cursor: pointer; font-family: var(--font); transition: all 0.2s;
+        }
+        .model-tag-expanded .toggle-device-btn:hover { border-color: var(--fg); color: var(--fg2); }
+        .model-tag-expanded .unload-btn {
+            padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(248,113,113,0.2);
+            background: rgba(248,113,113,0.06); color: var(--error); font-size: 0.68rem;
+            cursor: pointer; font-family: var(--font); transition: all 0.2s; font-weight: 600;
+        }
+        .model-tag-expanded .unload-btn:hover { background: rgba(248,113,113,0.15); }
+
+        /* Loading card */
+        .loading-card {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(124,106,239,0.06); border: 1px solid rgba(124,106,239,0.15);
+            border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+            font-size: 0.8rem; color: var(--text-dim); flex-wrap: wrap;
+        }
+        .loading-spinner-sm {
+            width: 16px; height: 16px; border: 2px solid rgba(124,106,239,0.2);
+            border-top-color: var(--fg); border-radius: 50%;
+            animation: spin 0.8s linear infinite; flex-shrink: 0;
+        }
+        .loading-card .loading-model { font-weight: 600; color: var(--fg2); }
+        .loading-card .loading-phase { color: var(--text-dim); font-size: 0.72rem; }
+        .loading-card .loading-time { margin-left: auto; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+        .loading-card.error-card {
+            background: rgba(248,113,113,0.06); border-color: rgba(248,113,113,0.2);
+        }
+        .loading-card.error-card .loading-model { color: var(--error); }
+        .loading-card.ready-card {
+            background: rgba(74,222,128,0.06); border-color: rgba(74,222,128,0.2);
+        }
+        .loading-card.ready-card .loading-model { color: var(--success); }
+
+        .loading-progress-bar {
+            width: 100%; height: 3px; background: rgba(124,106,239,0.1);
+            border-radius: 2px; margin-top: 4px; overflow: hidden;
+            flex-basis: 100%;
+        }
+        .loading-progress-bar-fill {
+            height: 100%; border-radius: 2px; transition: width 0.5s, background 0.5s;
+        }
+
+        /* Language filter pills */
+        .lang-filter { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+        .lang-pill {
+            padding: 3px 10px; border-radius: 12px; font-size: 0.7rem;
+            border: 1px solid var(--border); background: var(--surface2);
+            color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+            font-family: var(--font);
+        }
+        .lang-pill:hover { border-color: var(--fg); color: var(--fg2); }
+        .lang-pill.active {
+            background: rgba(124,106,239,0.15); border-color: rgba(124,106,239,0.3);
+            color: var(--fg2); font-weight: 600;
+        }
+
+        /* Voice hint */
+        .voice-hint {
+            background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 6px; padding: 8px 10px; font-size: 0.75rem;
+            color: var(--warning); margin-top: 8px; line-height: 1.4;
+        }
+
+        /* Status message */
+        .status-msg {
+            padding: 10px 14px; border-radius: 8px;
+            font-size: 0.82rem; font-weight: 500; text-align: center;
+            margin-top: 10px; transition: all 0.3s; opacity: 0;
+        }
+        .status-msg.info { opacity: 1; background: rgba(124,106,239,0.1); border: 1px solid rgba(124,106,239,0.2); }
+        .status-msg.error { opacity: 1; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--error); }
+        .status-msg.success { opacity: 1; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); color: var(--success); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(124,106,239,0.3); border-radius: 3px; }
+
+        /* Mobile player */
+        @media (max-width: 860px) {
+            .player-bar { flex-wrap: wrap; height: auto; gap: 8px; padding: 10px; }
+            .seek-wrap { order: 10; flex-basis: 100%; }
+            .vol-group { border: none; padding: 0; }
+            .time-display { border: none; padding: 0; min-width: 60px; }
+            .wave-box { height: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="bg-grid"></div>
+
+    <div class="app">
+        <header>
+            <div class="logo">NeuTTS-FastAPI</div>
+            <p class="subtitle">OpenAI-compatible Text-to-Speech powered by Neuphonic NeuTTS</p>
+            <div class="badges">
+                <div class="badge"><span class="dot dot-off" id="srv-dot"></span><span id="srv-text">Connecting...</span></div>
+                <div class="badge" id="model-badge">Models: ...</div>
+                <div class="badge" id="voice-badge">Voices: ...</div>
+                <div class="device-badge cpu" id="device-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+                    <span id="device-badge-text">CPU Only</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="gpu-warning-banner" style="display:none"></div>
+
+        <div class="main-grid">
+            <!-- Left Column: Editor + Player -->
+            <div class="left-col">
+                <div class="card text-editor">
+                    <div class="card-label">Text Input</div>
+                    <textarea id="tts-text" placeholder="Enter text to synthesize..." maxlength="10000">Hello, this is a test of the NeuTTS text-to-speech system. It supports multiple languages including English, German, French and Spanish.</textarea>
+                    <div class="text-meta">
+                        <span><span id="char-cnt">0</span> / 10,000 characters</span>
+                        <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to generate</span>
+                    </div>
+                </div>
+
+                <div class="card player">
+                    <div class="card-label">Audio Player</div>
+                    <div class="player-bar">
+                        <button class="player-btn" id="play-btn" title="Play/Pause">
+                            <svg id="play-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg id="pause-icon" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        </button>
+                        <div class="seek-wrap">
+                            <input type="range" class="seek-slider" id="seek-slider" min="0" max="1000" value="0">
+                        </div>
+                        <div class="time-display" id="time-disp">0:00 / 0:00</div>
+                        <div class="vol-group">
+                            <svg class="vol-icon" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                            <input type="range" class="vol-slider" id="vol-slider" min="0" max="100" value="100">
+                        </div>
+                    </div>
+                    <div class="wave-box" id="wave-box">
+                        <canvas id="wave-canvas"></canvas>
+                        <div class="gen-progress" id="gen-progress" style="width:0%"></div>
+                        <div class="dl-wrap" id="dl-wrap">
+                            <a class="dl-btn" id="dl-btn" download title="Download audio">
+                                <div class="dl-glow"></div>
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                                    <path d="M8 10L4.5 6.5h7L8 10z" fill="currentColor"/>
+                                    <path d="M8 2v8M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Controls -->
+            <div class="controls-panel">
+                <!-- Voice Selection -->
+                <div class="card">
+                    <div class="card-label">Voice</div>
+                    <input type="text" id="voice-search" placeholder="Search voices..." autocomplete="off">
+                    <div class="voice-list" id="voice-list"></div>
+                    <div id="voice-hint-container"></div>
+                    <button class="voice-upload-toggle" id="voice-upload-toggle">+ Clone a Voice (Upload or Record)</button>
+                    <div class="voice-upload-panel" id="voice-upload-panel">
+                        <input type="text" id="upload-voice-id" placeholder="Voice ID (e.g. my-voice)" autocomplete="off">
+                        <div class="field-row">
+                            <select id="upload-language">
+                                <option value="unknown">Language...</option>
+                                <option value="en-us">English (en-us)</option>
+                                <option value="de">German (de)</option>
+                                <option value="fr-fr">French (fr-fr)</option>
+                                <option value="es">Spanish (es)</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <select id="upload-gender">
+                                <option value="unknown">Gender...</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="drop-zone" id="upload-drop-zone">Drop WAV file here or click to browse
+                            <input type="file" id="upload-file-input" accept=".wav,audio/wav" style="display:none">
+                        </div>
+                        <div class="record-section">
+                            <div class="record-section-label">or record from microphone</div>
+                            <button class="record-btn" id="record-btn" title="Record from microphone">REC</button>
+                            <span class="record-timer" id="record-timer">0:00</span>
+                        </div>
+                        <textarea id="upload-ref-text" placeholder="Exact transcription of the audio..."></textarea>
+                        <div class="voice-upload-progress" id="upload-progress">
+                            <div class="voice-upload-progress-bar" id="upload-progress-bar"></div>
+                        </div>
+                        <button class="btn-upload" id="upload-btn" disabled>Upload & Clone Voice</button>
+                        <div class="voice-upload-status" id="upload-status"></div>
+                    </div>
+                </div>
+
+                <!-- Settings -->
+                <div class="card">
+                    <div class="card-label">Settings</div>
+                    <div class="field-row">
+                        <div class="field">
+                            <label class="field-label">Format</label>
+                            <select id="fmt-select">
+                                <option value="mp3" selected>MP3</option>
+                                <option value="wav">WAV</option>
+                                <option value="opus">Opus (OGG)</option>
+                                <option value="flac">FLAC</option>
+                                <option value="aac">AAC</option>
+                                <option value="pcm">PCM (raw)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Model</label>
+                            <select id="model-select"></select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="field-label">Speed</label>
+                        <div class="speed-row">
+                            <span style="font-size:0.7rem;color:var(--text-dim)">0.25x</span>
+                            <input type="range" class="speed-range" id="speed-range" min="0.25" max="4.0" step="0.05" value="1.0">
+                            <span style="font-size:0.7rem;color:var(--text-dim)">4.0x</span>
+                            <span class="speed-val" id="speed-val">1.00x</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap">
+                        <label class="check-row"><input type="checkbox" id="stream-chk"> Streaming</label>
+                        <label class="check-row"><input type="checkbox" id="autoplay-chk" checked> Auto-play</label>
+                    </div>
+                </div>
+
+                <!-- Generate -->
+                <div class="card">
+                    <button class="btn btn-gen" id="gen-btn" disabled>
+                        <span class="btn-label">Generate Speech</span>
+                        <div class="spinner"></div>
+                    </button>
+                    <button class="btn btn-cancel" id="cancel-btn" style="display:none">Cancel</button>
+                    <div class="status-msg" id="status-msg"></div>
+                </div>
+
+                <!-- Model Management -->
+                <div class="card model-panel">
+                    <div class="card-label">Model Management</div>
+                    <div id="loaded-models-list"></div>
+                    <div id="loading-tasks-list"></div>
+                    <div class="lang-filter" id="lang-filter"></div>
+                    <div class="model-load-row">
+                        <select id="registry-select" style="font-size:0.8rem"></select>
+                        <button class="btn-sm" id="load-btn">Load</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audio-el" preload="none"></audio>
+
+    <script>
+    (function() {
+        const API = location.origin;
+
+        // DOM
+        const $ = id => document.getElementById(id);
+        const ttsText = $('tts-text');
+        const charCnt = $('char-cnt');
+        const voiceSearch = $('voice-search');
+        const voiceList = $('voice-list');
+        const modelSelect = $('model-select');
+        const fmtSelect = $('fmt-select');
+        const speedRange = $('speed-range');
+        const speedVal = $('speed-val');
+        const streamChk = $('stream-chk');
+        const autoplayChk = $('autoplay-chk');
+        const genBtn = $('gen-btn');
+        const cancelBtn = $('cancel-btn');
+        const statusMsg = $('status-msg');
+        const srvDot = $('srv-dot');
+        const srvText = $('srv-text');
+        const modelBadge = $('model-badge');
+        const voiceBadge = $('voice-badge');
+        const deviceBadge = $('device-badge');
+        const deviceBadgeText = $('device-badge-text');
+        const playBtn = $('play-btn');
+        const playIcon = $('play-icon');
+        const pauseIcon = $('pause-icon');
+        const seekSlider = $('seek-slider');
+        const timeDisp = $('time-disp');
+        const volSlider = $('vol-slider');
+        const waveCanvas = $('wave-canvas');
+        const genProgress = $('gen-progress');
+        const dlWrap = $('dl-wrap');
+        const dlBtn = $('dl-btn');
+        const loadedModelsList = $('loaded-models-list');
+        const loadingTasksList = $('loading-tasks-list');
+        const langFilter = $('lang-filter');
+        const registrySelect = $('registry-select');
+        const loadBtn = $('load-btn');
+        const voiceHintContainer = $('voice-hint-container');
+        const gpuWarningBanner = $('gpu-warning-banner');
+        const audio = $('audio-el');
+
+        // Upload elements
+        const uploadToggle = $('voice-upload-toggle');
+        const uploadPanel = $('voice-upload-panel');
+        const uploadVoiceId = $('upload-voice-id');
+        const uploadLanguage = $('upload-language');
+        const uploadGender = $('upload-gender');
+        const uploadDropZone = $('upload-drop-zone');
+        const uploadFileInput = $('upload-file-input');
+        const uploadRefText = $('upload-ref-text');
+        const uploadProgress = $('upload-progress');
+        const uploadProgressBar = $('upload-progress-bar');
+        const uploadBtn = $('upload-btn');
+        const uploadStatus = $('upload-status');
+        const recordBtn = $('record-btn');
+        const recordTimer = $('record-timer');
+
+        let voices = [];
+        let selectedVoice = '';
+        let loadedModels = [];
+        let abortCtrl = null;
+        let waveCtx = waveCanvas.getContext('2d');
+        let waveAnim = null;
+        let analyser = null;
+        let audioCtx = null;
+        let audioSource = null;
+        let currentBlobUrl = null;
+        let gpuAvailable = false;
+        let gpuName = '';
+        let loadingTaskTimers = {};
+        let registryData = [];
+        let activeLangFilter = 'all';
+        let gpuWarningDismissed = false;
+
+        // Upload state
+        let uploadFile = null;
+        let mediaRecorder = null;
+        let recordChunks = [];
+        let recordTimerInterval = null;
+        let recordStartTime = 0;
+
+        // --- Audio Context & Analyser ---
+        function ensureAudioCtx() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+                audioSource = audioCtx.createMediaElementSource(audio);
+                audioSource.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            }
+        }
+
+        // --- Wave Visualization ---
+        function resizeCanvas() {
+            const box = $('wave-box');
+            waveCanvas.width = box.clientWidth * window.devicePixelRatio;
+            waveCanvas.height = box.clientHeight * window.devicePixelRatio;
+            waveCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        function drawWave() {
+            const w = waveCanvas.width / window.devicePixelRatio;
+            const h = waveCanvas.height / window.devicePixelRatio;
+            waveCtx.clearRect(0, 0, w, h);
+
+            if (analyser && !audio.paused) {
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(data);
+
+                const barCount = Math.min(data.length, 80);
+                const barW = w / barCount;
+                const grad = waveCtx.createLinearGradient(0, h, 0, 0);
+                grad.addColorStop(0, 'rgba(124,106,239,0.2)');
+                grad.addColorStop(1, 'rgba(167,139,250,0.8)');
+                waveCtx.fillStyle = grad;
+
+                for (let i = 0; i < barCount; i++) {
+                    const barH = (data[i] / 255) * h * 0.85;
+                    const x = i * barW;
+                    waveCtx.fillRect(x + 1, h - barH, barW - 2, barH);
+                }
+            } else {
+                // Idle wave
+                const t = Date.now() / 1000;
+                waveCtx.strokeStyle = 'rgba(124,106,239,0.3)';
+                waveCtx.lineWidth = 1.5;
+                waveCtx.beginPath();
+                for (let x = 0; x < w; x++) {
+                    const y = h/2 + Math.sin(x/30 + t*2) * 6 + Math.sin(x/15 + t*3) * 3;
+                    x === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
+                }
+                waveCtx.stroke();
+            }
+            waveAnim = requestAnimationFrame(drawWave);
+        }
+        drawWave();
+
+        // --- Char counter ---
+        ttsText.addEventListener('input', () => { charCnt.textContent = ttsText.value.length; });
+        charCnt.textContent = ttsText.value.length;
+
+        // --- Speed ---
+        speedRange.addEventListener('input', () => {
+            speedVal.textContent = parseFloat(speedRange.value).toFixed(2) + 'x';
+        });
+
+        // --- Model change: check language compatibility ---
+        modelSelect.addEventListener('change', () => {
+            if (!selectedVoice) return;
+            const voice = voices.find(v => v.name === selectedVoice);
+            const model = loadedModels.find(m => m.id === modelSelect.value);
+            if (voice && model && voice.language && model.language
+                && voice.language !== model.language) {
+                showLangMismatchWarning(voice.language);
+            } else {
+                clearLangMismatchWarning();
+            }
+        });
+
+        // --- Format time ---
+        function fmtTime(s) {
+            if (!s || !isFinite(s)) return '0:00';
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return m + ':' + String(sec).padStart(2, '0');
+        }
+
+        // --- Audio player ---
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                seekSlider.value = Math.floor((audio.currentTime / audio.duration) * 1000);
+                timeDisp.textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
+            }
+        });
+        audio.addEventListener('play', () => {
+            playIcon.style.display = 'none'; pauseIcon.style.display = 'block';
+            ensureAudioCtx(); if (audioCtx.state === 'suspended') audioCtx.resume();
+        });
+        audio.addEventListener('pause', () => {
+            playIcon.style.display = 'block'; pauseIcon.style.display = 'none';
+        });
+        audio.addEventListener('ended', () => {
+            playIcon.style.display = 'block'; pauseIcon.style.display = 'none';
+            seekSlider.value = 0;
+        });
+        playBtn.addEventListener('click', () => {
+            ensureAudioCtx();
+            if (audio.paused && audio.src) audio.play(); else audio.pause();
+        });
+        seekSlider.addEventListener('input', () => {
+            if (audio.duration) audio.currentTime = (seekSlider.value / 1000) * audio.duration;
+        });
+        volSlider.addEventListener('input', () => { audio.volume = volSlider.value / 100; });
+
+        // --- Fetch server state ---
+        async function refreshState() {
+            try {
+                const [hR, vR, mR, rR, sR, lR] = await Promise.all([
+                    fetch(API + '/health'), fetch(API + '/v1/audio/voices'),
+                    fetch(API + '/v1/models'), fetch(API + '/v1/models/registry'),
+                    fetch(API + '/debug/system'), fetch(API + '/v1/models/loaded')
+                ]);
+                const health = await hR.json();
+                const vData = await vR.json();
+                const mData = await mR.json();
+                const rData = await rR.json();
+                const sData = await sR.json();
+                const lData = await lR.json();
+
+                // Status
+                srvDot.className = 'dot dot-ok';
+                srvText.textContent = 'Online v' + health.version;
+
+                // GPU Badge
+                gpuAvailable = sData.gpu_available || false;
+                if (gpuAvailable && sData.gpu_info && sData.gpu_info.length > 0) {
+                    gpuName = sData.gpu_info[0].name || 'GPU';
+                    deviceBadge.className = 'device-badge gpu';
+                    deviceBadgeText.textContent = gpuName;
+                } else {
+                    gpuName = '';
+                    deviceBadge.className = 'device-badge cpu';
+                    deviceBadgeText.textContent = 'CPU Only';
+                }
+
+                // GPU Warning Banner
+                if (sData.gpu_detected_but_unusable && !gpuWarningDismissed) {
+                    gpuWarningBanner.style.display = 'block';
+                    gpuWarningBanner.innerHTML = '<div class="gpu-warning">'
+                        + '<span class="gpu-warning-icon">&#9888;</span>'
+                        + '<div class="gpu-warning-content">'
+                        + '<div class="gpu-warning-title">GPU Detected but Unusable</div>'
+                        + '<div class="gpu-warning-text">'
+                        + (sData.gpu_fix_instructions || 'GPU detected but PyTorch cannot use it.')
+                        + '</div></div>'
+                        + '<button class="gpu-warning-dismiss" id="gpu-dismiss-btn">Dismiss</button>'
+                        + '</div>';
+                    const dismissBtn = $('gpu-dismiss-btn');
+                    if (dismissBtn) dismissBtn.addEventListener('click', () => {
+                        gpuWarningDismissed = true;
+                        gpuWarningBanner.style.display = 'none';
+                    });
+                } else if (!sData.gpu_detected_but_unusable) {
+                    gpuWarningBanner.style.display = 'none';
+                }
+
+                // Voices
+                voices = vData.voices || [];
+                voiceBadge.textContent = 'Voices: ' + voices.length;
+                renderVoices(voices);
+                if (!selectedVoice && voices.length) {
+                    const firstAvailable = voices.find(v => v.available !== false);
+                    if (firstAvailable) selectVoice(firstAvailable.name);
+                }
+
+                // Models (for select dropdown) - preserve current selection
+                const prevModel = modelSelect.value;
+                loadedModels = mData.data || [];
+                modelBadge.textContent = 'Models: ' + loadedModels.length + ' loaded';
+                modelSelect.innerHTML = '';
+                loadedModels.forEach(m => {
+                    const o = document.createElement('option');
+                    o.value = m.id; o.textContent = m.id;
+                    modelSelect.appendChild(o);
+                });
+                // Restore previous selection if still loaded
+                if (prevModel && loadedModels.some(m => m.id === prevModel)) {
+                    modelSelect.value = prevModel;
+                }
+                genBtn.disabled = loadedModels.length === 0;
+
+                // Loaded models (detailed)
+                const loadedDetailed = lData.models || [];
+                renderLoadedModels(loadedDetailed);
+
+                // Voice hint
+                updateVoiceHint(loadedDetailed);
+
+                // Registry
+                registryData = rData.backbones || [];
+                renderLangFilter();
+                renderRegistryDropdown(activeLangFilter);
+            } catch {
+                srvDot.className = 'dot dot-off';
+                srvText.textContent = 'Offline';
+                genBtn.disabled = true;
+            }
+        }
+
+        // --- Voice hint ---
+        function updateVoiceHint(loadedDetailed) {
+            voiceHintContainer.innerHTML = '';
+            const loadedLangs = new Set(loadedDetailed.map(m => m.language));
+            loadedLangs.forEach(lang => {
+                if (!lang) return;
+                const langVoices = voices.filter(v => v.language === lang && v.available !== false);
+                if (langVoices.length <= 1) {
+                    const langLabel = {de:'German',es:'Spanish','fr-fr':'French','en-us':'English'}[lang] || lang;
+                    const hint = document.createElement('div');
+                    hint.className = 'voice-hint';
+                    hint.textContent = 'Only ' + langVoices.length + ' ' + langLabel
+                        + ' voice' + (langVoices.length !== 1 ? 's' : '') + ' available. '
+                        + "Use 'Clone a Voice' above to record or upload a custom voice.";
+                    voiceHintContainer.appendChild(hint);
+                }
+            });
+        }
+
+        // --- Loaded models rendering ---
+        function renderLoadedModels(models) {
+            loadedModelsList.innerHTML = '';
+            models.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'model-tag-expanded';
+
+                const isCuda = m.backbone_device && m.backbone_device.startsWith('cuda');
+                const deviceLabel = isCuda ? 'GPU' : 'CPU';
+                const deviceClass = isCuda ? 'gpu-badge' : 'cpu-badge';
+                const isGGUF = m.backend === 'gguf';
+
+                let actionsHtml = '<button class="unload-btn" data-id="' + m.model_id + '">&times;</button>';
+                if (!isGGUF && gpuAvailable) {
+                    const targetDevice = isCuda ? 'cpu' : 'cuda';
+                    const toggleLabel = isCuda ? 'CPU' : 'GPU';
+                    actionsHtml = '<button class="toggle-device-btn" data-id="' + m.model_id + '" data-target="' + targetDevice + '">'
+                        + toggleLabel + '</button>' + actionsHtml;
+                }
+
+                div.innerHTML = '<span class="model-name">' + m.model_id + '</span>'
+                    + '<span class="model-device-badge ' + deviceClass + '">' + deviceLabel + '</span>'
+                    + (m.language ? '<span class="model-lang">' + m.language + '</span>' : '')
+                    + '<span class="model-actions">' + actionsHtml + '</span>';
+
+                loadedModelsList.appendChild(div);
+            });
+
+            // Event listeners
+            loadedModelsList.querySelectorAll('.unload-btn').forEach(el => {
+                el.addEventListener('click', () => unloadModel(el.dataset.id));
+            });
+            loadedModelsList.querySelectorAll('.toggle-device-btn').forEach(el => {
+                el.addEventListener('click', () => switchDevice(el.dataset.id, el.dataset.target));
+            });
+        }
+
+        // --- Language filter ---
+        function renderLangFilter() {
+            const langs = new Set(registryData.map(b => b.language));
+            const allLangs = ['all', ...Array.from(langs).sort()];
+            langFilter.innerHTML = '';
+            allLangs.forEach(lang => {
+                const pill = document.createElement('button');
+                pill.className = 'lang-pill' + (activeLangFilter === lang ? ' active' : '');
+                pill.textContent = lang === 'all' ? 'All' : lang;
+                pill.addEventListener('click', () => {
+                    activeLangFilter = lang;
+                    renderLangFilter();
+                    renderRegistryDropdown(lang);
+                });
+                langFilter.appendChild(pill);
+            });
+        }
+
+        function renderRegistryDropdown(langFilterVal) {
+            const loadedIds = new Set(loadedModels.map(m => m.id));
+            registrySelect.innerHTML = '';
+            registryData.forEach(b => {
+                if (loadedIds.has(b.model_id)) return;
+                if (langFilterVal !== 'all' && b.language !== langFilterVal) return;
+                const o = document.createElement('option');
+                o.value = b.model_id;
+                o.textContent = b.model_id + ' (' + b.language + ', ' + b.backend + ')';
+                registrySelect.appendChild(o);
+            });
+        }
+
+        // --- Voice rendering ---
+        function renderVoices(list) {
+            voiceList.innerHTML = '';
+            list.forEach(v => {
+                const isUnavailable = v.available === false;
+                const div = document.createElement('div');
+                div.className = 'voice-item'
+                    + (v.name === selectedVoice ? ' active' : '')
+                    + (isUnavailable ? ' voice-unavailable' : '');
+
+                let html = '<span class="v-name">' + v.name + '</span>'
+                    + '<span class="v-lang">' + v.language + '</span>'
+                    + '<span class="v-meta">' + v.gender + '</span>';
+
+                if (v.custom && !isUnavailable) {
+                    html += '<span class="v-delete" data-name="' + v.name + '" title="Delete voice">&times;</span>';
+                }
+
+                div.innerHTML = html;
+                if (!isUnavailable) {
+                    div.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('v-delete')) return;
+                        selectVoice(v.name);
+                    });
+                }
+                voiceList.appendChild(div);
+            });
+
+            // Delete listeners
+            voiceList.querySelectorAll('.v-delete').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteVoice(el.dataset.name);
+                });
+            });
+        }
+        function selectVoice(name) {
+            selectedVoice = name;
+            voiceSearch.value = name;
+            document.querySelectorAll('.voice-item').forEach(el => {
+                el.classList.toggle('active', el.querySelector('.v-name').textContent === name);
+            });
+            // Auto-select a language-compatible model
+            autoSelectModelForVoice(name);
+        }
+        function autoSelectModelForVoice(voiceName) {
+            const voice = voices.find(v => v.name === voiceName);
+            if (!voice || !voice.language || loadedModels.length === 0) return;
+            // Check if current model already matches
+            const currentModel = loadedModels.find(m => m.id === modelSelect.value);
+            if (currentModel && currentModel.language === voice.language) {
+                clearLangMismatchWarning();
+                return;
+            }
+            // Find a loaded model that matches the voice language
+            const match = loadedModels.find(m => m.language === voice.language);
+            if (match) {
+                modelSelect.value = match.id;
+                clearLangMismatchWarning();
+            } else {
+                showLangMismatchWarning(voice.language);
+            }
+        }
+        function getLanguageLabel(code) {
+            const labels = { 'en-us': 'English', 'de': 'German', 'fr-fr': 'French', 'es': 'Spanish' };
+            return labels[code] || code;
+        }
+        function showLangMismatchWarning(voiceLang) {
+            let w = $('lang-mismatch-warning');
+            if (!w) {
+                w = document.createElement('div');
+                w.id = 'lang-mismatch-warning';
+                w.style.cssText = 'background:rgba(251,191,36,0.15);border:1px solid var(--warning);color:var(--warning);padding:8px 12px;border-radius:8px;font-size:0.82rem;margin-top:8px;';
+                modelSelect.parentElement.appendChild(w);
+            }
+            const label = getLanguageLabel(voiceLang);
+            w.textContent = 'No ' + label + ' model loaded! Load a matching model from the registry below.';
+            w.style.display = 'block';
+        }
+        function clearLangMismatchWarning() {
+            const w = $('lang-mismatch-warning');
+            if (w) w.style.display = 'none';
+        }
+        voiceSearch.addEventListener('input', () => {
+            const q = voiceSearch.value.toLowerCase();
+            renderVoices(voices.filter(v =>
+                v.name.toLowerCase().includes(q) || v.language.toLowerCase().includes(q)
+            ));
+        });
+        voiceSearch.addEventListener('focus', () => {
+            voiceSearch.select();
+            renderVoices(voices);
+        });
+
+        // --- Delete custom voice ---
+        async function deleteVoice(name) {
+            if (!confirm('Delete custom voice "' + name + '"?')) return;
+            try {
+                const r = await fetch(API + '/v1/audio/voices/' + encodeURIComponent(name), { method: 'DELETE' });
+                if (!r.ok) { const e = await r.json(); throw new Error(e.detail?.error?.message || 'Delete failed'); }
+                if (selectedVoice === name) selectedVoice = '';
+                refreshState();
+            } catch (e) { showStatus('Delete failed: ' + e.message, 'error'); }
+        }
+
+        // --- Voice Upload Logic ---
+        uploadToggle.addEventListener('click', () => {
+            uploadPanel.classList.toggle('open');
+            uploadToggle.textContent = uploadPanel.classList.contains('open')
+                ? '- Hide Clone Panel' : '+ Clone a Voice (Upload or Record)';
+        });
+
+        // Drag-and-drop
+        uploadDropZone.addEventListener('click', () => uploadFileInput.click());
+        uploadDropZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadDropZone.classList.add('dragover'); });
+        uploadDropZone.addEventListener('dragleave', () => uploadDropZone.classList.remove('dragover'));
+        uploadDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleUploadFile(e.dataTransfer.files[0]);
+        });
+        uploadFileInput.addEventListener('change', () => {
+            if (uploadFileInput.files.length) handleUploadFile(uploadFileInput.files[0]);
+        });
+
+        function handleUploadFile(file) {
+            if (!file.name.toLowerCase().endsWith('.wav') && file.type !== 'audio/wav') {
+                setUploadStatus('Only WAV files are supported', 'error');
+                return;
+            }
+            uploadFile = file;
+            uploadDropZone.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            uploadDropZone.classList.add('has-file');
+            validateUploadForm();
+        }
+
+        // Form validation
+        function validateUploadForm() {
+            const hasId = uploadVoiceId.value.trim().length > 0;
+            const hasFile = uploadFile !== null;
+            const hasText = uploadRefText.value.trim().length > 0;
+            uploadBtn.disabled = !(hasId && hasFile && hasText);
+        }
+        uploadVoiceId.addEventListener('input', validateUploadForm);
+        uploadRefText.addEventListener('input', validateUploadForm);
+
+        // Upload
+        uploadBtn.addEventListener('click', async () => {
+            if (!uploadFile || uploadBtn.disabled) return;
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            setUploadStatus('', '');
+
+            const formData = new FormData();
+            formData.append('voice_id', uploadVoiceId.value.trim());
+            formData.append('ref_text', uploadRefText.value.trim());
+            formData.append('audio', uploadFile);
+            formData.append('language', uploadLanguage.value);
+            formData.append('gender', uploadGender.value);
+
+            try {
+                const xhr = new XMLHttpRequest();
+                await new Promise((resolve, reject) => {
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            uploadProgressBar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+                        }
+                    });
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
+                        else reject(new Error(JSON.parse(xhr.responseText)?.detail?.error?.message || 'Upload failed'));
+                    });
+                    xhr.addEventListener('error', () => reject(new Error('Network error')));
+                    xhr.open('POST', API + '/v1/audio/voices/upload');
+                    xhr.send(formData);
+                });
+
+                setUploadStatus('Voice uploaded successfully!', 'success');
+                // Reset form
+                uploadVoiceId.value = '';
+                uploadRefText.value = '';
+                uploadFile = null;
+                uploadFileInput.value = '';
+                uploadDropZone.textContent = 'Drop WAV file here or click to browse';
+                uploadDropZone.classList.remove('has-file');
+                uploadLanguage.value = 'unknown';
+                uploadGender.value = 'unknown';
+                refreshState();
+            } catch (e) {
+                setUploadStatus(e.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload & Clone Voice';
+                uploadProgress.style.display = 'none';
+                validateUploadForm();
+            }
+        });
+
+        function setUploadStatus(msg, type) {
+            uploadStatus.textContent = msg;
+            uploadStatus.className = 'voice-upload-status' + (type ? ' upload-' + type : '');
+            if (msg && type) {
+                setTimeout(() => { uploadStatus.className = 'voice-upload-status'; }, 5000);
+            }
+        }
+
+        // --- Browser Voice Recording ---
+        recordBtn.addEventListener('click', async () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recordChunks = [];
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+                mediaRecorder.addEventListener('dataavailable', (e) => {
+                    if (e.data.size > 0) recordChunks.push(e.data);
+                });
+
+                mediaRecorder.addEventListener('stop', async () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    recordBtn.classList.remove('recording');
+                    recordBtn.textContent = 'REC';
+                    clearInterval(recordTimerInterval);
+
+                    const webmBlob = new Blob(recordChunks, { type: 'audio/webm' });
+                    try {
+                        const wavBlob = await convertToWav(webmBlob);
+                        uploadFile = new File([wavBlob], 'recording.wav', { type: 'audio/wav' });
+                        uploadDropZone.textContent = 'Recording (' + (wavBlob.size / 1024).toFixed(1) + ' KB)';
+                        uploadDropZone.classList.add('has-file');
+                        validateUploadForm();
+                    } catch (err) {
+                        setUploadStatus('Failed to convert recording: ' + err.message, 'error');
+                    }
+                });
+
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+                recordBtn.textContent = 'STOP';
+                recordStartTime = Date.now();
+                recordTimer.textContent = '0:00';
+                recordTimerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+                    recordTimer.textContent = Math.floor(elapsed / 60) + ':' + String(elapsed % 60).padStart(2, '0');
+                    if (elapsed >= 30) mediaRecorder.stop(); // Auto-stop at 30s
+                }, 1000);
+
+            } catch (err) {
+                setUploadStatus('Microphone access denied: ' + err.message, 'error');
+            }
+        });
+
+        // --- WAV Conversion (WebM -> WAV via AudioContext) ---
+        async function convertToWav(webmBlob) {
+            const convCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const arrayBuf = await webmBlob.arrayBuffer();
+            const audioBuf = await convCtx.decodeAudioData(arrayBuf);
+            convCtx.close();
+
+            // Downmix to mono
+            const numFrames = audioBuf.length;
+            const sampleRate = audioBuf.sampleRate;
+            let mono;
+            if (audioBuf.numberOfChannels === 1) {
+                mono = audioBuf.getChannelData(0);
+            } else {
+                mono = new Float32Array(numFrames);
+                for (let ch = 0; ch < audioBuf.numberOfChannels; ch++) {
+                    const chData = audioBuf.getChannelData(ch);
+                    for (let i = 0; i < numFrames; i++) mono[i] += chData[i];
+                }
+                for (let i = 0; i < numFrames; i++) mono[i] /= audioBuf.numberOfChannels;
+            }
+
+            // Write WAV header + 16-bit PCM data
+            const dataLen = mono.length * 2;
+            const buffer = new ArrayBuffer(44 + dataLen);
+            const view = new DataView(buffer);
+
+            function writeStr(offset, str) { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + dataLen, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); // PCM
+            view.setUint16(22, 1, true); // mono
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true); // byte rate
+            view.setUint16(32, 2, true); // block align
+            view.setUint16(34, 16, true); // bits per sample
+            writeStr(36, 'data');
+            view.setUint32(40, dataLen, true);
+
+            for (let i = 0; i < mono.length; i++) {
+                const s = Math.max(-1, Math.min(1, mono[i]));
+                view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        // --- Model load/unload ---
+        async function unloadModel(id) {
+            showStatus('Unloading ' + id + '...', 'info');
+            try {
+                const r = await fetch(API + '/v1/models/' + id, { method: 'DELETE' });
+                if (!r.ok) throw new Error(await r.text());
+                showStatus(id + ' unloaded', 'success');
+                refreshState();
+            } catch (e) { showStatus('Unload failed: ' + e.message, 'error'); }
+        }
+
+        async function switchDevice(modelId, targetDevice) {
+            showStatus('Switching ' + modelId + ' to ' + targetDevice + '...', 'info');
+            try {
+                const r = await fetch(API + '/v1/models/' + modelId + '/switch-device', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ backbone_device: targetDevice, codec_device: targetDevice })
+                });
+                if (!r.ok) {
+                    const e = await r.json();
+                    throw new Error(e.detail?.error?.message || 'Switch failed');
+                }
+                const task = await r.json();
+                startPollingTask(task.task_id);
+                showStatus('Switching ' + modelId + ' to ' + targetDevice + '...', 'info');
+            } catch (e) { showStatus('Switch failed: ' + e.message, 'error'); }
+        }
+
+        // --- Task polling ---
+        function startPollingTask(taskId) {
+            if (loadingTaskTimers[taskId]) return;
+            renderLoadingTask({ task_id: taskId, model_id: '...', status: 'pending', progress_message: 'Starting...', elapsed_seconds: 0 });
+            const timer = setInterval(async () => {
+                try {
+                    const r = await fetch(API + '/v1/models/load/' + taskId);
+                    if (!r.ok) { clearInterval(timer); delete loadingTaskTimers[taskId]; return; }
+                    const task = await r.json();
+                    renderLoadingTask(task);
+                    if (task.status === 'ready') {
+                        clearInterval(timer);
+                        delete loadingTaskTimers[taskId];
+                        showStatus(task.model_id + ' loaded!', 'success');
+                        refreshState();
+                    } else if (task.status === 'error') {
+                        clearInterval(timer);
+                        delete loadingTaskTimers[taskId];
+                        showStatus('Failed to load ' + task.model_id + ': ' + task.error_message, 'error');
+                        setTimeout(() => { removeLoadingCard(taskId); }, 5000);
+                    }
+                } catch {
+                    clearInterval(timer);
+                    delete loadingTaskTimers[taskId];
+                }
+            }, 1500);
+            loadingTaskTimers[taskId] = timer;
+        }
+
+        function renderLoadingTask(task) {
+            let card = document.querySelector('[data-task-id="' + task.task_id + '"]');
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'loading-card';
+                card.setAttribute('data-task-id', task.task_id);
+                loadingTasksList.appendChild(card);
+            }
+
+            const statusLabels = {
+                pending: 'Queued',
+                downloading: 'Downloading',
+                loading: 'Loading',
+                ready: 'Ready',
+                error: 'Error'
+            };
+
+            card.className = 'loading-card'
+                + (task.status === 'error' ? ' error-card' : '')
+                + (task.status === 'ready' ? ' ready-card' : '');
+
+            const spinnerHtml = (task.status === 'pending' || task.status === 'downloading' || task.status === 'loading')
+                ? '<div class="loading-spinner-sm"></div>' : '';
+
+            // Progress bar percentages by phase
+            const progressPct = { pending: 10, downloading: 40, loading: 75, ready: 100, error: 0 };
+            const progressColors = {
+                pending: 'rgba(148,163,184,0.5)',
+                downloading: 'linear-gradient(90deg, var(--fg), var(--fg2))',
+                loading: 'linear-gradient(90deg, #a78bfa, #c084fc)',
+                ready: 'var(--success)',
+                error: 'var(--error)'
+            };
+            const pct = progressPct[task.status] || 0;
+            const color = progressColors[task.status] || 'var(--fg)';
+
+            card.innerHTML = spinnerHtml
+                + '<span class="loading-model">' + task.model_id + '</span>'
+                + '<span class="loading-phase">' + (task.progress_message || statusLabels[task.status] || task.status) + '</span>'
+                + '<span class="loading-time">' + task.elapsed_seconds.toFixed(1) + 's</span>'
+                + '<div class="loading-progress-bar"><div class="loading-progress-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>';
+        }
+
+        function removeLoadingCard(taskId) {
+            const card = document.querySelector('[data-task-id="' + taskId + '"]');
+            if (card) card.remove();
+        }
+
+        loadBtn.addEventListener('click', async () => {
+            const id = registrySelect.value;
+            if (!id) return;
+            loadBtn.disabled = true; loadBtn.textContent = 'Loading...';
+            showStatus('Loading ' + id + '...', 'info');
+            try {
+                const r = await fetch(API + '/v1/models/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_id: id })
+                });
+                if (!r.ok) { const e = await r.json(); throw new Error(e.detail?.error?.message || 'Load failed'); }
+                const task = await r.json();
+                if (task.status === 'ready') {
+                    showStatus(id + ' loaded!', 'success');
+                    refreshState();
+                } else {
+                    startPollingTask(task.task_id);
+                }
+            } catch (e) { showStatus('Load failed: ' + e.message, 'error'); }
+            finally { loadBtn.disabled = false; loadBtn.textContent = 'Load'; }
+        });
+
+        // --- Generate ---
+        async function generate() {
+            const text = ttsText.value.trim();
+            if (!text || !modelSelect.value) return;
+
+            // Language mismatch check
+            const selVoice = voices.find(v => v.name === selectedVoice);
+            const selModel = loadedModels.find(m => m.id === modelSelect.value);
+            if (selVoice && selModel && selVoice.language && selModel.language
+                && selVoice.language !== selModel.language) {
+                const vLang = getLanguageLabel(selVoice.language);
+                const mLang = getLanguageLabel(selModel.language);
+                if (!confirm('Language mismatch!\n\nVoice "' + selectedVoice + '" is ' + vLang
+                    + ' but model "' + selModel.id + '" is ' + mLang + '.\n\n'
+                    + 'This will likely produce wrong accent/pronunciation.\nContinue anyway?')) {
+                    return;
+                }
+            }
+
+            genBtn.classList.add('spinning');
+            genBtn.disabled = true;
+            cancelBtn.style.display = 'block';
+            dlWrap.classList.remove('ready');
+            genProgress.style.width = '0%';
+            showStatus('Generating...', 'info');
+
+            if (currentBlobUrl) { URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = null; }
+
+            abortCtrl = new AbortController();
+            const t0 = performance.now();
+
+            try {
+                const res = await fetch(API + '/v1/audio/speech', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelSelect.value,
+                        input: text,
+                        voice: selectedVoice,
+                        response_format: fmtSelect.value,
+                        speed: parseFloat(speedRange.value),
+                        stream: streamChk.checked,
+                    }),
+                    signal: abortCtrl.signal,
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail?.error?.message || err.detail || 'Failed');
+                }
+
+                // Track progress for streaming with enhanced status
+                const reader = res.body.getReader();
+                const chunks = [];
+                let received = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    const elapsedNow = ((performance.now() - t0) / 1000).toFixed(1);
+                    const kbReceived = (received / 1024).toFixed(1);
+                    statusMsg.textContent = 'Generating... ' + kbReceived + ' KB | ' + elapsedNow + 's';
+                    genProgress.style.width = Math.min(90, received / 500) + '%';
+                }
+
+                genProgress.style.width = '100%';
+                const blob = new Blob(chunks);
+                const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+                const sizeKB = (blob.size / 1024).toFixed(1);
+
+                currentBlobUrl = URL.createObjectURL(blob);
+                audio.src = currentBlobUrl;
+                dlBtn.href = currentBlobUrl;
+                dlBtn.download = 'neutts_' + selectedVoice + '_' + Date.now() + '.' + fmtSelect.value;
+                dlBtn.title = 'Download (' + sizeKB + ' KB)';
+                dlWrap.classList.add('ready');
+
+                showStatus(
+                    'Done! ' + fmtSelect.value.toUpperCase() + ' | '
+                    + sizeKB + ' KB | '
+                    + elapsed + 's | ' + text.length + ' chars',
+                    'success'
+                );
+
+                if (autoplayChk.checked) {
+                    ensureAudioCtx();
+                    audio.play().catch(() => {});
+                }
+
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    showStatus('Cancelled', 'info');
+                } else {
+                    showStatus(e.message, 'error');
+                }
+            } finally {
+                genBtn.classList.remove('spinning');
+                genBtn.disabled = loadedModels.length === 0;
+                cancelBtn.style.display = 'none';
+                abortCtrl = null;
+                setTimeout(() => { genProgress.style.width = '0%'; }, 2000);
+            }
+        }
+
+        genBtn.addEventListener('click', generate);
+        cancelBtn.addEventListener('click', () => { if (abortCtrl) abortCtrl.abort(); });
+        ttsText.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                if (!genBtn.disabled) generate();
+            }
+        });
+
+        // --- Status ---
+        function showStatus(msg, type) {
+            statusMsg.textContent = msg;
+            statusMsg.className = 'status-msg ' + type;
+        }
+
+        // --- Init ---
+        refreshState();
+        setInterval(refreshState, 20000);
+    })();
+    </script>
+</body>
+</html>
