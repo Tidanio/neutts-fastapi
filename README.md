@@ -50,7 +50,7 @@ Messages are displayed in English, German, French, or Spanish based on your syst
 
 ```bash
 # Clone the repository
-git clone https://github.com/rbaluyos/neutts-fastapi.git
+git clone https://github.com/r1di/neutts-fastapi.git
 cd neutts-fastapi
 
 # Create virtual environment
